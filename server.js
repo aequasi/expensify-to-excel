@@ -198,7 +198,13 @@ function DownloadFiles(csv) {
                     let chopFront = target.substring(target.search(variable) + variable.length, target.length),
                         result    = chopFront.substring(0, chopFront.search(";"));
 
-                    return JSON.parse(result);
+
+                    console.log(result);
+                    try {
+                        return JSON.parse(result);
+                    } catch (e) {
+                        throw new Error(e, result, target);
+                    }
                 }
 
                 let transaction = findTextAndReturnRemainder(script, "var transaction =");
