@@ -48,7 +48,7 @@ app.post('/', upload.single('file'), (req, res) => {
             })
             .then(doc => {
                 try {
-                    zip.file('report.xlsx', doc.file);
+                    zip.file(`report_${req.body.name.replace(/ /g, '_')}.xlsx`, doc.file);
 
                     res.writeHead(200, {
                         'Content-Type':        'application/zip',
