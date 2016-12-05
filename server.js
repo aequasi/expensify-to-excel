@@ -42,7 +42,7 @@ app.post('/', upload.single('file'), (req, res) => {
             return;
         }
 
-        generateReport(output)
+        generateReport(output, req.body.name, req.body.department)
             .catch(err => {
                 res.send("Failed to generate report. " + err);
             })
@@ -52,7 +52,7 @@ app.post('/', upload.single('file'), (req, res) => {
 
                     res.writeHead(200, {
                         'Content-Type':        'application/zip',
-                        'Content-disposition': 'attachment; filename=report.zip'
+                        'Content-disposition': `attachment; filename=report_${req.body.name.replace(/ /g, '_')}.zip`
                     });
 
                     let data = zip.generate({base64: false, compression: 'DEFLATE'});
@@ -71,7 +71,7 @@ app.listen(port, () => {
     console.log("Listening on http://localhost:" + port);
 });
 
-function generateReport(csv) {
+function generateReport(csv, name, department) {
     return new Promise(resolve => {
         let sheetName = 'Report - ' + date.format("MMM Do YYYY"),
             report    = {
@@ -89,13 +89,13 @@ function generateReport(csv) {
                             {
                                 cells: [
                                     {value: 'Name: ', style: 'bold'},
-                                    {value: process.argv[3] + ' ' + process.argv[4], style: 'underline'},
+                                    {value: name, style: 'underline'},
                                 ]
                             },
                             {
                                 cells: [
                                     {value: 'Dept: ', style: 'bold'},
-                                    {value: process.argv[5], style: 'underline'},
+                                    {value: department, style: 'underline'},
                                 ]
                             },
                             {
