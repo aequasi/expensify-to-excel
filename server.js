@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
             <input type="text" name="name" placeholder="Name" />
             <input type="text" name="department" placeholder="Department" />
             <input type="file" name="file" accept=".csv" />
-            
+
             <input type="submit" value="Generate" />
         </form>
     </body>
@@ -185,6 +185,9 @@ function generateReport(csv, name, department) {
 function DownloadFiles(csv) {
     return csv.map(row => {
         return new Promise(resolve => {
+            if (!row[10]) {
+                Promise.resolve();
+            }
             request(row[10], (err, response, html) => {
                 if (err) {
                     console.log("One of the links for the reciepts is bad.");
