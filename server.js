@@ -214,7 +214,7 @@ function generateReport(csv, name, department) {
             cells: [
                 '',
                 'Total: ',
-                '$' + csv.map(i => i[2]).reduce((a, b) => a + b)
+                '$' + csv.map(i => i[2]).reduce((a, b) => parseInt(a) + parseInt(b))
             ]
         });
 
