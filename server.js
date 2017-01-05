@@ -1,15 +1,15 @@
-const express      = require('express'),
-      multer       = require('multer'),
-      upload       = multer({storage: multer.memoryStorage()}),
-      MemoryStream = require('memorystream'),
-      moment       = require('moment'),
-      excellent    = require('excellent'),
-      parse        = require('csv').parse,
-      fs           = require('fs'),
-      https        = require('https'),
-      request      = require('request'),
-      cheerio      = require('cheerio'),
-      app          = express();
+const express    = require('express'),
+      multer     = require('multer'),
+      upload     = multer({storage: multer.memoryStorage()}),
+      moment     = require('moment'),
+      excellent  = require('excellent'),
+      parse      = require('csv').parse,
+      fs         = require('fs'),
+      mime       = require('mime-types'),
+      https      = require('https'),
+      request    = require('request'),
+      cheerio    = require('cheerio'),
+      app        = express();
 
 const zip  = new require('node-zip')(),
       port = process.env.PORT || 3060,
@@ -18,14 +18,59 @@ const zip  = new require('node-zip')(),
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html>
+    <head>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.3.0/css/bulma.min.css">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css">
+    </head>
     <body>
-        <form enctype="multipart/form-data" method="post">
-            <input type="text" name="name" placeholder="Name" />
-            <input type="text" name="department" placeholder="Department" />
-            <input type="file" name="file" accept=".csv" />
-
-            <input type="submit" value="Generate" />
-        </form>
+        <section class="hero is-primary is-fullheight">
+            <div class="hero-head">
+                <header class="nav">
+                    <div class="nav-center">
+                        <h2 class="title nav-item is-2">
+                            SCTR Expense Report
+                        </a>
+                    </div>
+                </header>
+            </div>
+            <div class="hero-body">
+                <div class="container has-text-centered">
+                    <form enctype="multipart/form-data" method="post">
+                        <div class="control is-grouped">
+                            <div class="control is-horizontal is-expanded">
+                                <div class="control-label">
+                                    <label class="label">Name</label>
+                                </div>
+                                <div class="control">
+                                    <input type="text" name="name" placeholder="Name" class="input"/>
+                                </div>
+                            </div>
+                            <div class="control is-horizontal is-expanded">
+                                <div class="control-label">
+                                    <label class="label">Department</label>
+                                </div>
+                                <div class="control">
+                                    <input type="text" name="department" placeholder="Department" class="input"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control is-grouped">
+                            <div class="control is-horizontal is-expanded">
+                                <div class="control-label">
+                                    <label class="label">File</label>
+                                </div>
+                                <div class="control">
+                                    <input type="file" name="file" class="file" accept=".csv" />
+                                </div>
+                            </div>
+                            <div class="control is-horizontal is-expanded">
+                                <input class="button is-info is-fullwidth" type="submit" value="Generate" />
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
     </body>
 </html>
 
@@ -191,8 +236,9 @@ function DownloadFiles(csv) {
             }
             request(row[10], (err, response, html) => {
                 if (err) {
-                    console.log("One of the links for the reciepts is bad.");
-                    process.exit(1);
+                    console.log("One of the links for the receipts is bad.");
+                    resolve();
+                    return;
                 }
 
                 let $      = cheerio.load(html, {xmlMode: false}),
@@ -202,8 +248,6 @@ function DownloadFiles(csv) {
                     let chopFront = target.substring(target.search(variable) + variable.length, target.length),
                         result    = chopFront.substring(0, chopFront.search(";"));
 
-
-                    console.log(result);
                     try {
                         return JSON.parse(result);
                     } catch (e) {
@@ -213,25 +257,46 @@ function DownloadFiles(csv) {
 
                 let transaction = findTextAndReturnRemainder(script, "var transaction =");
 
-                let url = 'https://s3.amazonaws.com/receipts.expensify.com/' + transaction.receiptFilename;
-                console.log('downloading ' + url);
-                let fileName = transaction.merchant.replace(/ /g, '_') + '.pdf';
+                let url      = 'https://s3.amazonaws.com/receipts.expensify.com/' + transaction.receiptFilename;
+                let fileName = getFilename(transaction, response.headers['content-type']);
 
-                let memStream = new MemoryStream(null, {readable: false});
-                https.get(url, res => {
-                    res.pipe(memStream);
-                    res.on('end', () => {
-                        zip.folder('receipts').file(fileName, memStream.toString());
+                if (!transaction.receiptFilename) {
+                    zip.folder('receipts').file(fileName + '.txt', row[10]);
+                    resolve();
+                    return;
+                }
 
-                        resolve();
-                    });
-                    res.on('error', err => {
-                        console.log(err)
-                    })
-                }).on('error', err => {
-                    console.log(err)
+                let file = fs.createWriteStream("/tmp/" + fileName);
+                request({uri: url}).pipe(file).on('close', () => {
+                    file.end();
+                    try {
+                        fs.readFile("/tmp/" + fileName, (err, f) => {
+                            if (err) {
+                                console.log("One of the links for the receipts is bad.");
+                                resolve();
+                                return;
+                            }
+
+                            try {
+                                zip.folder('receipts').file(fileName, f);
+                            } catch (e) {
+                                console.log(e);
+                            }
+
+                            resolve();
+                        })
+                    } catch (e) {
+                        console.log(e)
+                    }
                 });
             })
         })
     });
+}
+
+function getFilename(transaction) {
+    const extension = /(?:\.([^.]+))?$/.exec(transaction.receiptFilename)[1],
+          name      = (transaction.modifiedMerchant || transaction.merchant).replace(/ /g, '_') + "_" + transaction.created;
+
+    return name + (extension ? '.' + extension : '');
 }
