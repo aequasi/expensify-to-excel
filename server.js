@@ -202,7 +202,7 @@ function generateReport(csv, name, department) {
                 cells: [
                     moment(new Date(row[0])).format('MM/DD/YYYY'),
                     row[1],
-                    '$' + row[2].replace(/[\d\.]/g, ''),
+                    '$' + row[2].replace(/['"]/g, ''),
                     notes
                 ]
             });
