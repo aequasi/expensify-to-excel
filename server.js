@@ -186,7 +186,7 @@ function DownloadFiles(csv) {
     return csv.map(row => {
         return new Promise(resolve => {
             if (!row[10]) {
-                Promise.resolve();
+                resolve();
                 return;
             }
             request(row[10], (err, response, html) => {
